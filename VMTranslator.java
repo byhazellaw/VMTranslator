@@ -9,73 +9,182 @@ public class VMTranslator {
 
 	public static void main(String[] args) throws FileNotFoundException, UnsupportedEncodingException {
 
-//		if (args.length > 0) {
+		if (args.length > 0) {
 
-			//TODO scan directory for .vm files
-			//translate all the .vm files into one .asm file
-		
-			String inFile = "SimpleFunction.vm";
-			int dot = inFile.indexOf('.');
+			
+			String input = args[0];
 
-			String fileName = inFile.substring(0, dot);
-			String outFileName = inFile.substring(0, dot) + ".asm";
+			File file = new File(input);
 
-			Scanner scanner = new Scanner(new File(inFile));
+			if (file.isFile()) {
 
-			PrintWriter writer = new PrintWriter(outFileName, "UTF-8");
+				int dot = input.indexOf('.');
 
-			int labelCount = 0;
+				String fileName = input.substring(0, dot);
 
-			while (scanner.hasNextLine()) {
+				String outFileName = input.substring(0, dot) + ".asm";
 
-				String line = scanner.nextLine();
+				Scanner scanner = new Scanner(new File(input));
 
-				// ignore empty and documentation
-				if (line.indexOf("/") == 0 || line.isEmpty()) {
-					continue;
-				}
-				
-				String cleaned = cleanLines(line);
+				PrintWriter writer = new PrintWriter(outFileName, "UTF-8");
 
+				int labelCount = 0;
 				
 				
-				Parser p = new Parser(cleaned);
-
-				int type = p.getType();
-				int value = p.getValue();
-				String seg = p.getSegment();
-				String aType = p.getaType();
-				String label = p.getLabel();
-				String functionName = p.getFunctionName();
-
-				CodeTranslate c = new CodeTranslate(value, type, seg, aType, labelCount, fileName, label, functionName);
-
+				String currentFunction = "";
+				boolean isFunctionLabel = false;
 				
-				
-				ArrayList<String> code = c.getCode();
+				while (scanner.hasNextLine()) {
 
-				if (code.size() != 0) {
+					String line = scanner.nextLine();
 
-					for (int i = 0; i < code.size(); i++) {
+					// ignore empty and documentation
+					if (line.indexOf("/") == 0 || line.isEmpty()) {
+						continue;
+					}
 
-						String aCode = code.get(i);
+					String cleaned = cleanLines(line);
 
-						writer.println(aCode);
+					Parser p = new Parser(cleaned);
 
+					int type = p.getType();
+					int value = p.getValue();
+					String seg = p.getSegment();
+					String aType = p.getaType();
+					String label = p.getLabel();
+
+					if (p.getFunctionName() != null) {
+
+						currentFunction = p.getFunctionName();
+						isFunctionLabel = true;
 						
 					}
+
+					CodeTranslate c = new CodeTranslate(value, type, seg, aType, labelCount, fileName, label,
+							currentFunction, isFunctionLabel);
+
+					ArrayList<String> code = c.getCode();
+
+					if (code.size() != 0) {
+
+						for (int i = 0; i < code.size(); i++) {
+
+							String aCode = code.get(i);
+
+							writer.println(aCode);
+
+							
+						}
+					}
+					
+					
+					
+					
+					labelCount++;
 				}
 
-				labelCount++;
+				scanner.close();
+				writer.close();
 
+			} else if (file.isDirectory()) {
+
+				File dir = new File(input);
+
+				String outFileName = input + ".asm";
+
+				int labelCount = 0;
+				
+
+				PrintWriter writer = new PrintWriter(outFileName, "UTF-8");
+
+				
+				
+				
+				// SP=256
+				// call Sys.init 0
+				ArrayList<String> code0 = CodeTranslate.bootStrap();
+
+				for (String str : code0) {
+
+					writer.println(str);
+				}
+
+				for (File f : dir.listFiles()) {
+
+					if (f.isFile() && f.getName().endsWith(".vm")) {
+
+						
+						int d = f.getName().indexOf('.');
+
+						String fileName = f.getName().substring(0, d);
+
+						String currentFunction = "";
+						boolean isFunctionLabel = false;
+						
+						
+						Scanner scanner = new Scanner(new File(dir + "/" + f.getName()));
+
+						while (scanner.hasNextLine()) {
+
+							String line = scanner.nextLine();
+
+							// ignore empty and documentation
+							if (line.indexOf("/") == 0 || line.isEmpty()) {
+								continue;
+							}
+
+							String cleaned = cleanLines(line);
+
+							Parser p = new Parser(cleaned);
+
+							int type = p.getType();
+							int value = p.getValue();
+							String seg = p.getSegment();
+							String aType = p.getaType();
+							String label = p.getLabel();
+
+							if (p.getFunctionName() != null) {
+
+								currentFunction = p.getFunctionName();
+								isFunctionLabel = true;
+								
+							}
+
+							CodeTranslate c = new CodeTranslate(value, type, seg, aType, labelCount, fileName, label,
+									currentFunction, isFunctionLabel);
+
+							ArrayList<String> code = c.getCode();
+
+							if (code.size() != 0) {
+
+								for (int i = 0; i < code.size(); i++) {
+
+									String aCode = code.get(i);
+
+									writer.println(aCode);
+
+								}
+							}
+
+							
+							labelCount++;
+							
+						}
+
+						scanner.close();
+
+					}
+
+				}
+				writer.close();
 			}
 
-			scanner.close();
-			writer.close();
-//		}
+		}
 
 	}
+
 	
+
 	// String processor
 	protected static String cleanLines(String line) {
 
@@ -90,7 +199,6 @@ public class VMTranslator {
 			justCode = line;
 		}
 
-		
 		return justCode;
 	}
 

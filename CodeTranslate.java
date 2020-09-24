@@ -11,14 +11,17 @@ public class CodeTranslate {
 	private int labelCount;
 	private String functionName;
 	private ArrayList<String> code;
+	private boolean isFunctionLabel;
 
-	public CodeTranslate(int value, int type, String seg, String aType, int labelCount, String fileName, String label, String functionName) {
+	public CodeTranslate(int value, int type, String seg, String aType, int labelCount, String fileName, String label,
+			String functionName, boolean isFunctionLabel) {
 
 		this.seg = seg;
 		this.labelCount = labelCount;
 		this.fileName = fileName;
 		this.functionName = functionName;
 		code = new ArrayList<>();
+		this.isFunctionLabel = isFunctionLabel;
 
 		// push
 		if (type == 1) {
@@ -48,6 +51,7 @@ public class CodeTranslate {
 
 			}
 
+			// pop
 		} else if (type == 2 && seg != null) {
 
 			if (seg.equals("LCL") || seg.equals("ARG") || seg.equals("THIS") || seg.equals("THAT")) {
@@ -57,11 +61,11 @@ public class CodeTranslate {
 			} else if (seg.equals("temp")) {
 
 				popTemp(value);
-				
+
 			} else if (seg.equals("pointer")) {
 
 				popPointer(value);
-				
+
 			} else if (seg.equals("static")) {
 
 				popStatic(value);
@@ -85,13 +89,12 @@ public class CodeTranslate {
 
 		} else if (type == 7) {
 
-
 			writeReturn(value);
-			
-		} else if(type==8) {
-			
+
+		} else if (type == 8) {
+
 			writeCall(value);
-			
+
 		} else if (type == 0 && !aType.equals(null)) {
 
 			switch (aType) {
@@ -123,138 +126,113 @@ public class CodeTranslate {
 				not();
 				break;
 			default:
-				//nothing happens
+				// nothing happens
 				break;
 			}
 
 		} else {
-			
-			//nothing happens if the command is not one of the above types
+
+			// nothing happens if the command is not one of the above types
 		}
 
 	}
-	
-	
-	// calling a function after value arguments have been pushed
-	private void writeCall(int value) {
-		
-		String reAdd = "@RETURN_" + labelCount;
-	
-		//declare a label for return address - current SP after arguments	
-		code.add("@SP"); 
-		code.add("A=M");
-		code.add("D=A");
-		//SP - nArgs
-		for (int i=0; i<value; i++) {
-			
-			code.add("D=D-1");
-		}
-		code.add(reAdd);
-		code.add("M=D");
 
-		
-		//push return address
-		code.add(reAdd);
-		code.add("D=M");
+	// calling a function after arguments have been pushed on the stack
+	private void writeCall(int value) {
+
+		String reAdd = functionName + "$ret." + labelCount;
+
+		code.add("//writeCall");
+
+		// push return address
+		code.add("@" + reAdd);
+		code.add("D=A");
+
 		code.add("@SP");
 		code.add("A=M");
 		code.add("M=D");
 		updateSP();
-		
-		
-		//push LCL
+
+		// push LCL
 		code.add("@LCL");
 		code.add("D=M");
 		code.add("@SP");
 		code.add("A=M");
 		code.add("M=D");
 		updateSP();
-		
-		
-		//push ARG
+
+		// push ARG
 		code.add("@ARG");
 		code.add("D=M");
 		code.add("@SP");
 		code.add("A=M");
 		code.add("M=D");
 		updateSP();
-		
-		
-		//push THIS
+
+		// push THIS
 		code.add("@THIS");
 		code.add("D=M");
 		code.add("@SP");
 		code.add("A=M");
 		code.add("M=D");
 		updateSP();
-		
-		
-		//push THAT
+
+		// push THAT
 		code.add("@THAT");
 		code.add("D=M");
 		code.add("@SP");
 		code.add("A=M");
 		code.add("M=D");
 		updateSP();
-		
-		//ARG = SP - value - 5
+
+		// ARG = SP - value - 5
 		code.add("@SP");
-		code.add("D=M");
-		
-		for(int i=0; i<value+5; i++) {
-			
-			code.add("D=D-1");
-		}
+		code.add("A=M");
+		code.add("D=A");
+		int j = value + 5;
+		code.add("@" + j);
+		code.add("D=D-A");
 		code.add("@ARG");
 		code.add("M=D");
-		
-		
-		//LCL = SP
+
+		// LCL = SP
 		code.add("@SP");
-		code.add("D=M");
-		
+		code.add("A=M");
+		code.add("D=A");
+
 		code.add("@LCL");
 		code.add("M=D");
-		
-		//goto function
-		code.add("@"+functionName);
-		
 
-		
-		
+		// goto function
+		code.add("@" + functionName);
+		code.add("0;JMP");
+
+		code.add("(" + reAdd + ")");
+
 	}
 
-
-	//sys.init to be placed at the beginning of the asm
-	private void writeInit() {
-		
-		//TODO finish writeInit
-		//SP=256 - initialize stack pointed to 0x0100
-		code.add("@256");
-		code.add("D=A");
-		code.add("@SP");
-		code.add("M=D");
-
-		//call Sys.init
-		
-		
-	}
-	
+	// labels inside return only live in return
 	private void writeReturn(int value) {
 
 		code.add("//return");
 
-		String f = "@FRAME" + Integer.toString(labelCount);
+		String f = "@RET" + labelCount;
 
 		// FRAME=LCL
 		code.add("@LCL");
 		code.add("A=M");
 		code.add("D=A");
-
 		code.add(f);
 		code.add("M=D");
-		
+
 		// RET=*(FRAME-5)
+
+		String retu = "reAdd" + labelCount;
+		code.add("@5");
+		code.add("A=D-A");
+		code.add("D=M");
+		code.add("@" + retu);
+		code.add("M=D");
 
 		// *ARG = pop()
 		currentSpMValue();
@@ -269,7 +247,9 @@ public class CodeTranslate {
 		code.add("@SP");
 		code.add("M=D");
 
-		
+		code.add("@ARG");
+		code.add("M=M-1");
+
 		// THAT=*(FRAME-1)
 		code.add(f);
 		code.add("A=M-1");
@@ -278,8 +258,6 @@ public class CodeTranslate {
 		code.add("@THAT");
 		code.add("M=D");
 
-		
-		
 		// THIS=*(FRAME-2)
 		code.add(f);
 		code.add("M=M-1");
@@ -287,9 +265,7 @@ public class CodeTranslate {
 		code.add("D=M");
 		code.add("@THIS");
 		code.add("M=D");
-		
-		
-		
+
 		// ARG=*(FRAME-3)
 		code.add(f);
 		code.add("M=M-1");
@@ -297,9 +273,7 @@ public class CodeTranslate {
 		code.add("D=M");
 		code.add("@ARG");
 		code.add("M=D");
-		
-		
-		
+
 		// LCL=*(FRAME-4)
 		code.add(f);
 		code.add("M=M-1");
@@ -307,19 +281,94 @@ public class CodeTranslate {
 		code.add("D=M");
 		code.add("@LCL");
 		code.add("M=D");
-		
-		
-		
-		// goto RET
+
+		// goto Return address
+		code.add("@" + retu);
+		code.add("A=M");
+		code.add("0;JMP");
 
 		return;
 
 	}
 
+	// only call bootStrap when translating a folder of .vm files
+	protected static ArrayList<String> bootStrap() {
+
+		ArrayList<String> codeBoot = new ArrayList<>();
+
+		codeBoot.add("//SP=256");
+		codeBoot.add("@256");
+		codeBoot.add("D=A");
+		codeBoot.add("@SP");
+		codeBoot.add("M=D");
+
+		codeBoot.add("//call sys.init 0");
+
+		// push return address
+		codeBoot.add("@Sys.init$ret$0");
+		codeBoot.add("D=M");
+		codeBoot.add("@SP");
+		codeBoot.add("A=M");
+		codeBoot.add("M=D");
+
+		codeBoot.add("@SP");
+		codeBoot.add("M=M+1");
+
+		// push LCL
+		codeBoot.add("@LCL");
+		codeBoot.add("D=M");
+		codeBoot.add("@SP");
+		codeBoot.add("A=M");
+		codeBoot.add("M=D");
+
+		codeBoot.add("@SP");
+		codeBoot.add("M=M+1");
+
+		// push ARG
+		codeBoot.add("@ARG");
+		codeBoot.add("D=M");
+		codeBoot.add("@SP");
+		codeBoot.add("A=M");
+		codeBoot.add("M=D");
+
+		codeBoot.add("@SP");
+		codeBoot.add("M=M+1");
+
+		// push THIS
+		codeBoot.add("@THIS");
+		codeBoot.add("D=M");
+		codeBoot.add("@SP");
+		codeBoot.add("A=M");
+		codeBoot.add("M=D");
+
+		codeBoot.add("@SP");
+		codeBoot.add("M=M+1");
+
+		// push THAT
+		codeBoot.add("@THAT");
+		codeBoot.add("D=M");
+		codeBoot.add("@SP");
+		codeBoot.add("A=M");
+		codeBoot.add("M=D");
+
+		codeBoot.add("@SP");
+		codeBoot.add("M=M+1");
+
+		// goto function
+		codeBoot.add("@Sys.init");
+		codeBoot.add("0;JMP");
+
+		codeBoot.add("(Sys.init$ret$0)");
+
+		return codeBoot;
+
+	}
+
 	private void writeFunction(int value) {
 
+		code.add("//writeFunction");
 		// declare label for function entry
-		code.add("@"+functionName);
+		code.add("(" + functionName + ")");
 
 		// repeat value times PUSH 0
 		for (int i = 0; i < value; i++) {
@@ -340,94 +389,82 @@ public class CodeTranslate {
 
 	}
 
+	// if goto lives in functions
 	private void writeIfLabel(String label) {
 
 		currentSpMValue();
+		// if current *SP !=0 then go
 
-		code.add("@" + label);
+		if (isFunctionLabel) {
 
-		code.add("D;JGT");
-
-		return;
-
-	}
-
-	private void writeGoToLabel(String label) {
-
-		if (label != null) {
-
-			code.add("@" + label);
-			code.add("0;JMP");
-
-		}
-		return;
-	}
-
-	private void label(String label) {
-
-		if (label != null) {
-
-			code.add("(" + label + ")");
-
-		}
-
-		return;
-
-	}
-
-	private void popStatic(int value) {
-
-		code.add("//popStatic");
-		currentSpMValue();
-
-		code.add("@" + fileName + "." + value);
-
-		if (value == 0) {
-
-			code.add("A=M");
+			code.add("@" + functionName + "$" + label);
 
 		} else {
 
-			for (int i = 0; i < value; i++) {
+			code.add("@" + fileName + "$" + label);
 
-				code.add("A=A+1");
-			}
+		}
+		code.add("D;JNE");
+
+		return;
+
+	}
+
+	// goto lives in functions
+	private void writeGoToLabel(String label) {
+
+		if (isFunctionLabel) {
+
+			code.add("@" + functionName + "$" + label);
+
+		} else {
+
+			code.add("@" + fileName + "$" + label);
 
 		}
 
+		code.add("0;JMP");
+
+		return;
+	}
+
+	// label for arithmetic commands, outside functions
+	private void label(String label) {
+
+		if (isFunctionLabel) {
+
+			code.add("(" + functionName + "$" + label + ")");
+
+		} else {
+
+			code.add("(" + fileName + "$" + label + ")");
+
+		}
+
+		return;
+
+	}
+
+	// global variables - predefined from 5-256
+	private void popStatic(int value) {
+
+		code.add("//popStatic");
+
+		String f = "@" + fileName + "." + value;
+
+		currentSpMValue();
+
+		code.add(f);
 		code.add("M=D");
-
-		// reset base address
-		if (value != 0) {
-
-			code.add("@" + seg);
-
-			for (int i = 0; i < value; i++) {
-				code.add("A=A-1");
-
-			}
-		}
 
 		return;
 	}
 
 	private void pushStatic(int value) {
 
+		code.add("//push Static");
+
 		code.add("@" + fileName + "." + value);
-
-		if (value == 0) {
-
-			code.add("A=M");
-
-		} else {
-
-			for (int i = 0; i < value; i++) {
-
-				code.add("A=A+1");
-			}
-
-		}
-
 		code.add("D=M");
 
 		code.add("@SP");
@@ -436,22 +473,12 @@ public class CodeTranslate {
 
 		updateSP();
 
-		// reset base address
-		if (value != 0) {
-
-			code.add("@" + seg);
-
-			for (int i = 0; i < value; i++) {
-				code.add("A=A-1");
-
-			}
-		}
-
 		return;
 	}
 
 	private void pushPointer(int value) {
 
+		code.add("//push pointer");
 		if (value == 0) {
 			// *SP=THIS, SP++
 
@@ -485,6 +512,7 @@ public class CodeTranslate {
 
 	private void popPointer(int value) {
 
+		code.add("//pop pointer");
 		if (value == 0) {
 
 			// SP--, THIS=*SP
@@ -516,9 +544,10 @@ public class CodeTranslate {
 		code.add("//pop");
 		currentSpMValue();
 
-		String addr = Integer.toString(value + 5);
+		int val = value + 5;
 
-		code.add("@" + addr);
+		code.add("@" + val);
+//		code.add("A=M");
 		code.add("M=D");
 
 		return;
@@ -527,9 +556,10 @@ public class CodeTranslate {
 	// addr = 5+i; *SP=*addr, SP++
 	private void pushTemp(int value) {
 
-		String addr = Integer.toString(value + 5);
+		code.add("//pushTemp");
+		int val = value + 5;
 
-		code.add("@" + addr);
+		code.add("@" + val);
 		code.add("D=M");
 
 		code.add("@SP");
@@ -542,7 +572,6 @@ public class CodeTranslate {
 	}
 
 	// push constant i == *SP =i, SP++
-
 	private void pushConstant(int value) {
 
 		// constant
@@ -562,13 +591,12 @@ public class CodeTranslate {
 
 	}
 
-	// M+1 is the only allowed expression
 	// addr = segmentPointer + i; *SP = *addr, SP++
 	private void push(String seg, int value) {
 
-		code.add("//push");
-		code.add("@" + seg);
+		code.add("//pushSeg");
 
+		code.add("@" + seg);
 		if (value == 0) {
 
 			code.add("A=M");
@@ -581,7 +609,6 @@ public class CodeTranslate {
 			}
 			code.add("A=M");
 		}
-
 		code.add("D=M");
 
 		code.add("@SP");
@@ -607,6 +634,7 @@ public class CodeTranslate {
 	// addr = segmentPointer + i; SP--; *addr = *SP
 	private void pop(String seg, int value) {
 
+		code.add("//pop");
 		// D = *sp
 		currentSpMValue();
 
@@ -642,8 +670,6 @@ public class CodeTranslate {
 
 	// SP--
 	private void currentSpMValue() {
-
-		code.add("// D = *SP");
 
 		code.add("@SP");
 		code.add("M=M-1");
@@ -746,7 +772,6 @@ public class CodeTranslate {
 		code.add("@SP");
 		code.add("M=M-1");
 
-//		code.add("//go to SP");
 		code.add("A=M");
 
 		code.add("D=M-D");
@@ -815,9 +840,10 @@ public class CodeTranslate {
 		String label = "IFJLT_" + Integer.toString(labelCount);
 		String end = "END_" + Integer.toString(labelCount);
 
+		code.add("//lt");
+
 		currentSpMValue();
 
-		code.add("//lt");
 		code.add("@SP");
 		code.add("M=M-1");
 		code.add("A=M");
@@ -836,6 +862,7 @@ public class CodeTranslate {
 		code.add("@SP");
 		code.add("A=M");
 		code.add("M=-1");
+//		code.add("D=M");
 
 		code.add("(" + end + ")");
 		updateSP();
