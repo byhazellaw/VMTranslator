@@ -1,6 +1,5 @@
 # VMTranslator
 
-VMTranslator is a program that reads in a .vm file and output a .asm file that the CPU Emulator can read.
-It consists of three classes: CodeTranslate, Parser and Main. 
+Translates VM files into ASM files on the Hack computer.
 
 Part of the Nand2Tetris course: https://www.nand2tetris.org
